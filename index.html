@@ -298,7 +298,7 @@
 
         <!-- 上传表单 -->
         <div class="upload-form">
-            <h2>上传视频</h2>
+            <h2>上传视频（转码需要时间）</h2>
             <form id="uploadForm">
                 <div class="form-group">
                     <label for="videoFile">选择视频文件：</label>
@@ -339,6 +339,69 @@
         </div>
     </div>
 
+    <!-- ===== 分页栏 ===== -->
+    <div id="paginationBar" style="text-align:center;margin:30px 0;font-size:14px;color:#94a3b8;">
+    <button id="btnPrev" class="btn btn-secondary" onclick="changePage(-1)">上一页</button>
+    <span style="margin:0 12px;">
+        第 <span id="curPage">1</span> 页 / 共 <span id="totalPages">1</span> 页
+    </span>
+    <button id="btnNext" class="btn btn-secondary" onclick="changePage(1)">下一页</button>
+    </div>
+
+    <script>
+    /* ========== 分页相关 ========== */
+    const PAGE_SIZE = 8;               // 每页条数，可自行调整
+    let page = 1;                      // 当前页码
+    let totalPages = 1;                // 总页数
+
+    /* 改造后的 loadVideoList：带分页参数 */
+    async function loadVideoList(targetPage = page) {
+    try {
+        const res = await fetch(`${API_BASE_URL}/videos?page=${targetPage}&pageSize=${PAGE_SIZE}`);
+        const data = await res.json();          // 期望后端返回 {videos:[],total:number}
+        const videos = data.videos || data;     // 若后端直接返回数组，用 data 即可
+        const total = data.total || videos.length;
+
+        totalPages = Math.ceil(total / PAGE_SIZE) || 1;
+        page = targetPage;
+
+        /* 渲染列表 */
+        const box = document.getElementById('videoList');
+        if (!videos.length) {
+        box.innerHTML = '<div class="loading">暂无视频，请上传一些视频！</div>';
+        } else {
+        box.innerHTML = videos.map(v => `
+            <div class="video-card" onclick="playVideo('${v.id}','${v.title}','${v.filename}')">
+            <div class="video-thumbnail">🎥</div>
+            <div class="video-info">
+                <div class="video-title">${v.title}</div>
+                <div class="video-duration">时长: ${v.duration||'未知'}</div>
+            </div>
+            </div>`).join('');
+        }
+
+        /* 更新分页栏 */
+        document.getElementById('curPage').textContent  = page;
+        document.getElementById('totalPages').textContent = totalPages;
+        document.getElementById('btnPrev').disabled = page <= 1;
+        document.getElementById('btnNext').disabled = page >= totalPages;
+    } catch (e) {
+        console.error('加载视频列表失败:', e);
+        showMessage('加载失败: ' + (e.message||e), 'error');
+    }
+    }
+
+    /* 翻页按钮 */
+    function changePage(delta) {
+    const next = page + delta;
+    if (next < 1 || next > totalPages) return;
+    loadVideoList(next);
+    }
+
+    /* 初次加载 */
+    window.addEventListener('load', () => loadVideoList(1));
+    </script>
+
     <script>
         // 每 30 秒自动刷新一次
         // setInterval(loadVideoList, 30_000);
@@ -355,36 +418,6 @@
             setTimeout(() => {
                 messageEl.style.display = 'none';
             }, 3000);
-        }
-
-        // 获取视频列表
-        async function loadVideoList() {
-            try {
-                const response = await fetch(`${API_BASE_URL}/videos`);
-                const videos = await response.json();
-                
-                const videoListEl = document.getElementById('videoList');
-                
-                if (videos.length === 0) {
-                    videoListEl.innerHTML = '<div class="loading">暂无视频，请上传一些视频！</div>';
-                    return;
-                }
-
-                videoListEl.innerHTML = videos.map(video => `
-                    <div class="video-card" onclick="playVideo('${video.id}', '${video.title}', '${video.filename}')">
-                        <div class="video-thumbnail">
-                            🎥
-                        </div>
-                        <div class="video-info">
-                            <div class="video-title">${video.title}</div>
-                            <div class="video-duration">时长: ${video.duration || '未知'}</div>
-                        </div>
-                    </div>
-                `).join('');
-            } catch (error) {
-                console.error('加载视频列表失败: ', error);
-                showMessage('加载视频列表失败: '+ (error.message || error), 'error');
-            }
         }
 
         // 播放视频
@@ -426,7 +459,7 @@
             player.pause();
             player.src = '';
             player.load();          // 关键：让浏览器释放文件占用
-            // closePlayer();
+            closePlayer();
 
             try {
                 const response = await fetch(`${API_BASE_URL}/videos/${willRemovId}`, {
