@@ -22,5 +22,5 @@
 
 ```bash
 uv sync
-uv run main:app --reload
+uv run main.py
 ```
