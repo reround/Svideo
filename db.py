@@ -5,7 +5,8 @@ from pathlib import Path
 from typing import List, Optional
 from pydantic import BaseModel
 
-DB_FILE = Path(__file__).with_name("videohub.db")
+db_name = "videohub.db"
+DB_FILE = Path(__file__).with_name(db_name)
 
 class VideoInfo(BaseModel):
     id: str
@@ -20,6 +21,9 @@ def get_conn():
     return sqlite3.connect(DB_FILE, check_same_thread=False)
 
 def init_db():
+    if  DB_FILE.exists():
+        return
+    
     with closing(get_conn()) as conn, closing(conn.cursor()) as cur:
         cur.execute("""
             CREATE TABLE IF NOT EXISTS videos (
@@ -52,6 +56,7 @@ def insert_video(v: VideoInfo):
         conn.commit()
 
 def delete_video(vid: str) -> bool:
+    print(f"deleting video : {vid}")
     with closing(get_conn()) as conn, closing(conn.cursor()) as cur:
         cur.execute("DELETE FROM videos WHERE id=?", (vid,))
         if cur.rowcount > 0:
@@ -82,22 +87,22 @@ def create_test_data():
     # 初始化数据库
     init_db()
     
-    # 创建10条测试数据
-    test_videos = [
-        VideoInfo(
-            id=f"video_{i}",
-            title=f"测试视频{i}",
-            filename=f"test_video_{i}.mp4",
-            original=f"original_{i}.mp4",
-            duration=f"{i*10}:00",
-            url=f"https://example.com/video_{i}"
-        )
-        for i in range(1, 11)
-    ]
+    # # 创建10条测试数据
+    # test_videos = [
+    #     VideoInfo(
+    #         id=f"video_{i}",
+    #         title=f"测试视频{i}",
+    #         filename=f"test_video_{i}.mp4",
+    #         original=f"original_{i}.mp4",
+    #         duration=f"{i*10}:00",
+    #         url=f"https://example.com/video_{i}"
+    #     )
+    #     for i in range(1, 11)
+    # ]
     
-    # 插入测试数据
-    for video in test_videos:
-        insert_video(video)
+    # # 插入测试数据
+    # for video in test_videos:
+    #     insert_video(video)
     
     # # 打印所有数据以验证
     # videos = list_videos()

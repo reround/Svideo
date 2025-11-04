@@ -9,10 +9,14 @@ import asyncio
 import subprocess
 import aiofiles
 
+
 from fastapi import Response, Query
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+
 
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -23,15 +27,35 @@ from pydantic import BaseModel, Field
 # 基础配置
 # ------------------------------------------------------
 ROOT = Path(__file__).resolve().parent
-UPLOAD_DIR = ROOT / "videos"  # 原始文件
-STATIC_DIR = ROOT / "static"  # 转码后 mp4
+
+DATA_DIR = ROOT / "data"  # 数据目录
+VEDEOS_DIR = DATA_DIR / "videos"  # 原始视频文件
+CLIPS_DIR = DATA_DIR / "clips"  # 转码后 mp4
+THUMBNAILS_DIR = DATA_DIR / "thumbnails"  # 自动生成的封面
+STATIC_DIR = ROOT / "static"
+
 CHUNK_SIZE = 256 * 1024  # 流式读取 256 KB
 is_transcode = False  # 视频是否转码
+vedio_suffix = ".xxx"  # 保存的视频的后缀，用于隐藏视频，防止直接访问
 
-for d in (UPLOAD_DIR, STATIC_DIR):
+for d in (DATA_DIR, STATIC_DIR, THUMBNAILS_DIR, CLIPS_DIR, VEDEOS_DIR):
     d.mkdir(exist_ok=True)
 
-app = FastAPI(title="VideoHub", version="1.0")
+
+# @app.on_event("startup")
+# def on_startup():
+#     db.init_db()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 启动时执行
+    print("startup")
+    db.init_db()
+    yield
+    print("shutdown")
+    # 关闭时执行（如果需要）
+
+
+app = FastAPI(title="VideoHub", version="1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -42,15 +66,10 @@ app.add_middleware(
 )
 
 
-# @app.on_event("startup")
-# def on_startup():
-#     db.init_db()
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # 启动时执行
-    db.init_db()
-    yield
-    # 关闭时执行（如果需要）
+# 1. 挂载静态文件
+app.mount("/static", StaticFiles(directory="static"), name="static")
+# 2. 创建模板实例
+templates = Jinja2Templates(directory="templates")
 
 
 # ------------------------------------------------------
@@ -125,8 +144,8 @@ async def upload_video(file: UploadFile = File(...), title: str = Form(...)):
         raise HTTPException(400, "请上传视频文件")
     vid = str(uuid.uuid4())
     ext = Path(file.filename).suffix
-    raw_path = UPLOAD_DIR / f"{vid}{ext}"
-    mp4_path = STATIC_DIR / f"{vid}.mp4"
+    raw_path = VEDEOS_DIR / f"{vid}{ext}"
+    mp4_path = CLIPS_DIR / f"{vid}{vedio_suffix}"
 
     if is_transcode:  # 如果需要转码
         with raw_path.open("wb") as f:
@@ -179,19 +198,8 @@ def delete_video(vid: str):
     if not ok:
         raise HTTPException(404, "视频不存在")
 
-    # 删除UPLOAD_DIR中的匹配文件
-    for file in UPLOAD_DIR.glob(f"{vid}.*"):
-        try:
-            file.unlink()
-        except PermissionError:
-            # 如果文件正在使用，稍后重试
-            import time
-
-            time.sleep(0.5)  # 等待500ms
-            file.unlink()
-
     # 删除STATIC_DIR中的mp4文件
-    static_file = STATIC_DIR / f"{vid}.mp4"
+    static_file = CLIPS_DIR / f"{vid}{vedio_suffix}"
     try:
         static_file.unlink()
     except PermissionError:
@@ -201,7 +209,6 @@ def delete_video(vid: str):
         static_file.unlink()
 
     return {"ok": True}
-    return {"ok": True}
 
 
 # ------------------------------------------------------
@@ -209,7 +216,7 @@ def delete_video(vid: str):
 # ------------------------------------------------------
 # @app.get("/videos/{filename}")
 # async def stream_video(filename: str, request: Request):
-#     file_path = STATIC_DIR / filename
+#     file_path = CLIPS_DIR / filename
 #     if not file_path.exists():
 #         raise HTTPException(404, "文件不存在")
 
@@ -253,7 +260,7 @@ def delete_video(vid: str):
 
 @app.get("/videos/{filename}")
 async def stream_video(filename: str, request: Request):
-    file_path = STATIC_DIR / filename
+    file_path = CLIPS_DIR / filename
     if not file_path.exists():
         raise HTTPException(404, "文件不存在")
 
@@ -303,10 +310,14 @@ async def stream_video(filename: str, request: Request):
 
 # 假设 index.html 和 main.py 放在同一目录
 @app.get("/", response_class=HTMLResponse)
-def home():
-    with open("index.html", "r", encoding="utf-8") as f:
-        frontend_html = f.read()  # ← 正确方法名
-    return frontend_html
+def home(request: Request):
+    # with open("index.html", "r", encoding="utf-8") as f:
+    #     frontend_html = f.read()  # ← 正确方法名
+    # return frontend_html
+    return templates.TemplateResponse(
+            "index.html",
+            {"request": request}
+        )
 
 
 # ------------------------------------------------------
