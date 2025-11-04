@@ -372,11 +372,27 @@
 
     <!-- ===== 分页栏 ===== -->
     <div id="paginationBar" style="text-align:center;margin:30px 0;font-size:14px;color:#94a3b8;">
-    <button id="btnPrev" class="btn btn-secondary" onclick="changePage(-1)">上一页</button>
-    <span style="margin:0 12px;">
-        第 <span id="curPage">1</span> 页 / 共 <span id="totalPages">1</span> 页
-    </span>
-    <button id="btnNext" class="btn btn-secondary" onclick="changePage(1)">下一页</button>
+        <button id="btnPrev" class="btn btn-secondary" onclick="changePage(-1)">上一页</button>
+        <span style="margin:0 12px;">
+            第 <span id="curPage">1</span> 页 / 共 <span id="totalPages">1</span> 页
+        </span>
+        <button id="btnNext" class="btn btn-secondary" onclick="changePage(1)">下一页</button>
+        
+        <!-- 添加跳转到指定页的功能 -->
+        <span style="margin-left: 20px;">
+            跳转到
+            <input type="number" id="gotoPageInput" 
+                style="width: 50px; padding: 5px; margin: 0 5px; 
+                        background: rgba(15, 23, 42, 0.4);
+                        border: 1px solid rgba(94, 234, 212, 0.2);
+                        border-radius: 4px;
+                        color: #e2e8f0;
+                        text-align: center;"
+                min="1" 
+                onkeypress="if(event.keyCode===13) gotoPage()">
+            页
+            <button class="btn btn-secondary" onclick="gotoPage()">确定</button>
+        </span>
     </div>
 
     <script>
@@ -385,41 +401,58 @@
     let page = 1;                      // 当前页码
     let totalPages = 1;                // 总页数
 
-    /* 改造后的 loadVideoList：带分页参数 */
-    async function loadVideoList(targetPage = page) {
-    try {
-        const res = await fetch(`${API_BASE_URL}/videos?page=${targetPage}&pageSize=${PAGE_SIZE}`);
-        const data = await res.json();          // 期望后端返回 {videos:[],total:number}
-        const videos = data.videos || data;     // 若后端直接返回数组，用 data 即可
-        const total = data.total || videos.length;
-
-        totalPages = Math.ceil(total / PAGE_SIZE) || 1;
-        page = targetPage;
-
-        /* 渲染列表 */
-        const box = document.getElementById('videoList');
-        if (!videos.length) {
-        box.innerHTML = '<div class="loading">暂无视频，请上传一些视频！</div>';
-        } else {
-        box.innerHTML = videos.map(v => `
-            <div class="video-card" onclick="playVideo('${v.id}','${v.title}','${v.filename}')">
-            <div class="video-thumbnail">🎥</div>
-            <div class="video-info">
-                <div class="video-title">${v.title}</div>
-                <div class="video-duration">时长: ${v.duration||'未知'}</div>
-            </div>
-            </div>`).join('');
+    // 添加跳转到指定页的函数
+    function gotoPage() {
+        const input = document.getElementById('gotoPageInput');
+        const targetPage = parseInt(input.value);
+        
+        if (isNaN(targetPage) || targetPage < 1 || targetPage > totalPages) {
+            showMessage('请输入有效的页码', 'error');
+            return;
         }
-
-        /* 更新分页栏 */
-        document.getElementById('curPage').textContent  = page;
-        document.getElementById('totalPages').textContent = totalPages;
-        document.getElementById('btnPrev').disabled = page <= 1;
-        document.getElementById('btnNext').disabled = page >= totalPages;
-    } catch (e) {
-        console.error('加载视频列表失败:', e);
-        showMessage('加载失败: ' + (e.message||e), 'error');
+        
+        loadVideoList(targetPage);
+        input.value = '';
     }
+
+    // 修改loadVideoList函数，确保页码输入框的值正确更新
+    async function loadVideoList(targetPage = page) {
+        try {
+            const res = await fetch(`${API_BASE_URL}/videos?page=${targetPage}&pageSize=${PAGE_SIZE}`);
+            const data = await res.json();
+            const videos = data.videos || data;
+            const total = data.total || videos.length;
+
+            totalPages = Math.ceil(total / PAGE_SIZE) || 1;
+            page = targetPage;
+
+            // 渲染列表
+            const box = document.getElementById('videoList');
+            if (!videos.length) {
+                box.innerHTML = '<div class="loading">暂无视频，请上传一些视频！</div>';
+            } else {
+                box.innerHTML = videos.map(v => `
+                    <div class="video-card" onclick="playVideo('${v.id}','${v.title}','${v.filename}')">
+                    <div class="video-thumbnail">🎥</div>
+                    <div class="video-info">
+                        <div class="video-title">${v.title}</div>
+                        <div class="video-duration">时长: ${v.duration||'未知'}</div>
+                    </div>
+                    </div>`).join('');
+            }
+
+            // 更新分页栏
+            document.getElementById('curPage').textContent = page;
+            document.getElementById('totalPages').textContent = totalPages;
+            document.getElementById('btnPrev').disabled = page <= 1;
+            document.getElementById('btnNext').disabled = page >= totalPages;
+            
+            // 更新跳转输入框的最大值
+            document.getElementById('gotoPageInput').max = totalPages;
+        } catch (e) {
+            console.error('加载视频列表失败:', e);
+            showMessage('加载失败: ' + (e.message||e), 'error');
+        }
     }
     // 添加在现有 script 标签内
     async function handleBatchUpload(files) {

@@ -7,6 +7,7 @@
 - [x] 视频播放
 - [x] 视频上传
 - [x] 视频删除
+- [x] 分页跳转
 - [ ] 视频搜索
 - [ ] 视频分类
 
@@ -17,6 +18,7 @@
 - ffmpeg-python
 - python-multipart
 - uvicorn
+- ...
 
 ## 使用方法
 
