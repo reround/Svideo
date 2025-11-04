@@ -26,6 +26,7 @@ ROOT = Path(__file__).resolve().parent
 UPLOAD_DIR = ROOT / "videos"  # 原始文件
 STATIC_DIR = ROOT / "static"  # 转码后 mp4
 CHUNK_SIZE = 256 * 1024  # 流式读取 256 KB
+is_transcode = False  # 视频是否转码
 
 for d in (UPLOAD_DIR, STATIC_DIR):
     d.mkdir(exist_ok=True)
@@ -122,16 +123,20 @@ def _do_transcode(src: Path, dst: Path):
 async def upload_video(file: UploadFile = File(...), title: str = Form(...)):
     if not file.content_type or not file.content_type.startswith("video/"):
         raise HTTPException(400, "请上传视频文件")
-
     vid = str(uuid.uuid4())
     ext = Path(file.filename).suffix
     raw_path = UPLOAD_DIR / f"{vid}{ext}"
     mp4_path = STATIC_DIR / f"{vid}.mp4"
 
-    with raw_path.open("wb") as f:
-        shutil.copyfileobj(file.file, f)
-
-    await _transcode(raw_path, mp4_path)
+    if is_transcode:  # 如果需要转码
+        with raw_path.open("wb") as f:
+            shutil.copyfileobj(file.file, f)
+        await _transcode(raw_path, mp4_path)
+        # 删除原始文件
+        raw_path.unlink()
+    else:  # 如果不需要转码
+        with mp4_path.open("wb") as f:
+            shutil.copyfileobj(file.file, f)
 
     info = db.VideoInfo(
         id=vid,
@@ -142,9 +147,6 @@ async def upload_video(file: UploadFile = File(...), title: str = Form(...)):
         url=f"/videos/{mp4_path.name}",  # 本地播放地址
     )
     db.insert_video(info)
-    
-    # 删除原始文件
-    raw_path.unlink()
     return info
 
 
@@ -176,8 +178,7 @@ def delete_video(vid: str):
     ok = db.delete_video(vid)
     if not ok:
         raise HTTPException(404, "视频不存在")
-    
-    
+
     # 删除UPLOAD_DIR中的匹配文件
     for file in UPLOAD_DIR.glob(f"{vid}.*"):
         try:
@@ -185,18 +186,20 @@ def delete_video(vid: str):
         except PermissionError:
             # 如果文件正在使用，稍后重试
             import time
+
             time.sleep(0.5)  # 等待500ms
             file.unlink()
-    
+
     # 删除STATIC_DIR中的mp4文件
     static_file = STATIC_DIR / f"{vid}.mp4"
     try:
         static_file.unlink()
     except PermissionError:
         import time
+
         time.sleep(0.5)  # 等待500ms
         static_file.unlink()
-    
+
     return {"ok": True}
     return {"ok": True}
 
@@ -247,6 +250,7 @@ def delete_video(vid: str):
 #         iter_file(), status_code=status_code, headers=headers, media_type="video/mp4"
 #     )
 
+
 @app.get("/videos/{filename}")
 async def stream_video(filename: str, request: Request):
     file_path = STATIC_DIR / filename
@@ -271,7 +275,7 @@ async def stream_video(filename: str, request: Request):
 
     async def iter_file():
         try:
-            async with aiofiles.open(file_path, 'rb') as f:
+            async with aiofiles.open(file_path, "rb") as f:
                 await f.seek(start)
                 remaining = end - start + 1
                 while remaining > 0:
@@ -293,12 +297,8 @@ async def stream_video(filename: str, request: Request):
         "Cache-Control": "no-cache",  # 防止缓存导致文件被锁定
     }
     return StreamingResponse(
-        iter_file(), 
-        status_code=status_code, 
-        headers=headers, 
-        media_type="video/mp4"
+        iter_file(), status_code=status_code, headers=headers, media_type="video/mp4"
     )
-
 
 
 # 假设 index.html 和 main.py 放在同一目录

@@ -296,7 +296,7 @@
         <!-- 消息提示 -->
         <div id="message" class="message"></div>
 
-        <!-- 上传表单 -->
+        <!-- 上传表单
         <div class="upload-form">
             <h2>上传视频（转码需要时间）</h2>
             <form id="uploadForm">
@@ -313,7 +313,38 @@
             <div id="progressBar" class="progress-bar">
                 <div id="progress" class="progress">0%</div>
             </div>
+        </div> -->
+        <!-- 在上传表单中添加新的按钮 -->
+        <div class="upload-form">
+            <h2>上传视频（转码需要时间）</h2>
+            <form id="uploadForm">
+                <div class="form-group">
+                    <label for="videoFile">选择视频文件：</label>
+                    <input type="file" id="videoFile" accept="video/*" required>
+                </div>
+                <div class="form-group">
+                    <label for="videoTitle">视频标题：</label>
+                    <input type="text" id="videoTitle" placeholder="输入视频标题" required>
+                </div>
+                <button type="submit" class="btn">上传视频</button>
+            </form>
+            
+            <!-- 添加批量上传按钮 -->
+            <div style="margin-top: 20px;">
+                <button class="btn btn-secondary" onclick="document.getElementById('folderInput').click()">
+                    📁 批量上传文件夹
+                </button>
+                <input type="file" id="folderInput" style="display: none" webkitdirectory directory multiple>
+            </div>
+            
+            <div id="progressBar" class="progress-bar">
+                <div id="progress" class="progress">0%</div>
+            </div>
+            <div id="batchProgress" class="progress-bar" style="display: none;">
+                <div id="batchProgressText" class="progress">0/0</div>
+            </div>
         </div>
+
 
         <!-- 视频播放器 -->
         <div id="videoPlayerContainer" class="video-player-container" style="display: none;">
@@ -390,6 +421,61 @@
         showMessage('加载失败: ' + (e.message||e), 'error');
     }
     }
+    // 添加在现有 script 标签内
+    async function handleBatchUpload(files) {
+        const progressBar = document.getElementById('batchProgress');
+        const progressText = document.getElementById('batchProgressText');
+        
+        progressBar.style.display = 'block';
+        progressText.style.width = '100%';
+        
+        let completed = 0;
+        const total = files.length;
+        progressText.textContent = `${completed}/${total}`;
+        
+        for (const file of files) {
+            if (!file.type.startsWith('video/')) continue;
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            // 使用文件名作为标题（去除扩展名）
+            formData.append('title', file.name.replace(/\.[^/.]+$/, ""));
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    console.error(`上传 ${file.name} 失败`);
+                }
+            } catch (error) {
+                console.error(`上传 ${file.name} 失败:`, error);
+            }
+            
+            completed++;
+            progressText.textContent = `${completed}/${total}`;
+        }
+        
+        progressBar.style.display = 'none';
+        showMessage(`批量上传完成！成功上传 ${completed} 个视频`);
+        loadVideoList();
+    }
+
+    // 添加文件夹选择事件监听
+    document.getElementById('folderInput').addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+        
+        if (!confirm(`确定要上传 ${files.length} 个视频文件吗？`)) {
+            e.target.value = '';
+            return;
+        }
+        
+        await handleBatchUpload(files);
+        e.target.value = '';
+    });
 
     /* 翻页按钮 */
     function changePage(delta) {
