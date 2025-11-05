@@ -4,13 +4,16 @@
 
 ```txt
 project_root/
-├── data/
-│   ├── videos/          # 原始上传视频
-│   ├── thumbnails/      # 自动生成的封面
-│   └── clips/           # 切片或转码后片段
-├── static/              # 仅放公开静态资源（如网页用logo）
-├── media/               # Django/Flask默认上传根目录
-└── uploads/             # 非框架项目常用手动创建的目录
+|- data/
+|   |- videos/          # 原始上传视频
+|   |-thumbnails/       # 自动生成的封面
+|   |- clips/           # 切片或转码后片段
+|- static/              # 仅放公开静态资源（如网页用logo）
+|   |- css/             # css 文件
+|   |- js/              # js 文件
+|   |- img/             # 图片
+|- templates/           # html 模板
+│   |- macros/          # html 模板宏
 ```
 
 ## TODO
