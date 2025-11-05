@@ -1,0 +1,79 @@
+<!-- 网址改变时必须修改变量：API_BASE_URL -->
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频播放网站</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/main_style.css') }}">
+
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>🎬 视频播放网站</h1>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- 消息提示 -->
+        <div id="message" class="message"></div>
+
+        <!-- 在上传表单中添加新的按钮 -->
+        <div class="upload-form">
+            <h2>上传视频（转码需要时间）</h2>
+            <form id="uploadForm">
+                <div class="form-group">
+                    <label for="videoFile">选择视频文件：</label>
+                    <input type="file" id="videoFile" accept="video/*" required>
+                </div>
+                <div class="form-group">
+                    <label for="videoTitle">视频标题：</label>
+                    <input type="text" id="videoTitle" placeholder="输入视频标题" required>
+                </div>
+                <button type="submit" class="btn">上传视频</button>
+            </form>
+            
+            <!-- 添加批量上传按钮 -->
+            <div style="margin-top: 20px;">
+                <button class="btn btn-secondary" onclick="document.getElementById('folderInput').click()">
+                    📁 批量上传文件夹
+                </button>
+                <input type="file" id="folderInput" style="display: none" webkitdirectory directory multiple>
+            </div>
+            
+            <div id="progressBar" class="progress-bar">
+                <div id="progress" class="progress">0%</div>
+            </div>
+            <div id="batchProgress" class="progress-bar" style="display: none;">
+                <div id="batchProgressText" class="progress">0/0</div>
+            </div>
+        </div>
+
+
+        <!-- 视频播放器 -->
+        <div id="videoPlayerContainer" class="video-player-container" style="display: none;">
+            <h2 id="currentVideoTitle"></h2>
+            <video id="videoPlayer" controls>
+                您的浏览器不支持视频播放。
+            </video>
+            <div class="video-actions">
+                <button class="btn btn-secondary" onclick="closePlayer()">关闭播放器</button>
+                <button class="btn delete-btn" onclick="deleteCurrentVideo()">删除视频</button>
+            </div>
+        </div>
+
+        <!-- 视频列表 -->
+         <h2>
+        视频列表
+        <button class="btn btn-secondary" onclick="loadVideoList()" style="margin-left: 12px;">
+            🔄 刷新
+        </button>
+        </h2>
+        {% block content %}{% endblock %} 
+        {# {% block content %}{% endblock %}  #}
+    </div>
+    <script src="{{ url_for('static', path='js/index.js') }}"></script>
+</body>
+</html>

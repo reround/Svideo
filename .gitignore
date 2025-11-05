@@ -8,6 +8,6 @@ wheels/
 *.db
 
 # Virtual environments
-.venv
-
+.venv/
+.vs/
 data/

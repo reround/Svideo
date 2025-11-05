@@ -16,7 +16,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-
+from fastapi import Header
 
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -169,24 +169,34 @@ async def upload_video(file: UploadFile = File(...), title: str = Form(...)):
     return info
 
 
+# ------------------------------------------------------
+# API：获取视频列表
+# ------------------------------------------------------
 @app.get("/videos")
 def list_videos(
+    request: Request,                     # 关键：声明 Request 参数
     response: Response,
-    page: int = Query(1, ge=1, description="页码"),
-    pageSize: int = Query(10, ge=1, le=100, description="每页数量"),
+    page: int = Query(1, ge=1),
+    pageSize: int = Query(10, ge=1, le=100),
+    accept: str | None = Header(None),
 ):
     response.headers["Cache-Control"] = "no-store, must-revalidate"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
 
-    # 计算跳过的记录数
     skip = (page - 1) * pageSize
-
-    # 获取视频列表和总数
     videos = db.list_videos_paged(skip=skip, limit=pageSize)
-    total = db.get_videos_count()  # 你需要实现这个函数来获取总数
+    total = db.get_videos_count()
 
-    return {"videos": videos, "total": total}
+    total_pages = (total + pageSize - 1) // pageSize   # 总页数
+    # 如果前端要 JSON，就返回 JSON
+    if accept and "application/json" in accept:
+        return {
+            "videos": videos,
+            "total": total,
+            "page": page,
+            "total_pages": total_pages,
+        }
 
 
 # ------------------------------------------------------
@@ -209,53 +219,6 @@ def delete_video(vid: str):
         static_file.unlink()
 
     return {"ok": True}
-
-
-# ------------------------------------------------------
-# 流式播放：支持 Range
-# ------------------------------------------------------
-# @app.get("/videos/{filename}")
-# async def stream_video(filename: str, request: Request):
-#     file_path = CLIPS_DIR / filename
-#     if not file_path.exists():
-#         raise HTTPException(404, "文件不存在")
-
-#     file_size = file_path.stat().st_size
-#     range_header = request.headers.get("range")
-
-#     start = 0
-#     end = file_size - 1
-#     status_code = 200
-
-#     if range_header:
-#         try:
-#             h = range_header.replace("bytes=", "").split("-")
-#             start = int(h[0]) if h[0] else 0
-#             end = int(h[1]) if h[1] else file_size - 1
-#             status_code = 206
-#         except ValueError:
-#             raise HTTPException(416, "Range Not Satisfiable")
-
-#     def iter_file():
-#         with file_path.open("rb") as f:
-#             f.seek(start)
-#             remaining = end - start + 1
-#             while remaining > 0:
-#                 read_size = min(CHUNK_SIZE, remaining)
-#                 data = f.read(read_size)
-#                 if not data:
-#                     break
-#                 remaining -= len(data)
-#                 yield data
-
-#     headers = {
-#         "Accept-Ranges": "bytes",
-#         "Content-Length": str(end - start + 1),
-#         "Content-Range": f"bytes {start}-{end}/{file_size}",
-#     }
-#     return StreamingResponse(
-#         iter_file(), status_code=status_code, headers=headers, media_type="video/mp4"
-#     )
 
 
 @app.get("/videos/{filename}")
@@ -314,10 +277,7 @@ def home(request: Request):
     # with open("index.html", "r", encoding="utf-8") as f:
     #     frontend_html = f.read()  # ← 正确方法名
     # return frontend_html
-    return templates.TemplateResponse(
-            "index.html",
-            {"request": request}
-        )
+    return templates.TemplateResponse("index.html", {"request": request})
 
 
 # ------------------------------------------------------

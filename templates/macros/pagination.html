@@ -1,0 +1,26 @@
+{% macro render(id='paginationBar', cur=1, total=1, callback='changePage', goto_callback='gotoPage') %}
+
+<!-- ===== 分页栏 ===== -->
+<div id="{{ id }}" style="text-align:center;margin:30px 0;font-size:14px;color:#94a3b8;">
+    <button id="btnPrev" class="btn btn-secondary" onclick="{{ callback }}(-1)">上一页</button>
+    <span style="margin:0 12px;">
+        第 <span id="curPage">{{ cur }}</span> 页 / 共 <span id="totalPages">{{ total }}</span> 页
+    </span>
+    <button id="btnNext" class="btn btn-secondary" onclick="{{ callback }}(1)">下一页</button>
+
+    <!-- 跳转到 -->
+    <span style="margin-left: 20px;">
+        跳转到
+        <input type="number"
+               id="gotoPageInput"
+               style="width: 50px; padding: 5px; margin: 0 5px;
+                      background: rgba(15, 23, 42, 0.4);
+                      border: 1px solid rgba(94, 234, 212, 0.2);
+                      border-radius: 4px; color: #e2e8f0; text-align: center;"
+               min="1"
+               onkeypress="if(event.key==='Enter') {{ goto_callback }}()">
+        页
+        <button class="btn btn-secondary" onclick="{{ goto_callback }}()">确定</button>
+    </span>
+</div>
+{% endmacro %}
